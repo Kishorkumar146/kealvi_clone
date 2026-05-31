@@ -1,10 +1,6 @@
 import { NextResponse } from "next/server";
-import type { Question } from "@/lib/seed";
 import { supabase } from "@/lib/supabase";
-
-// In-memory store — the fallback when Supabase isn't configured. Survives
-// page reloads (kept in memory between requests) but wiped on server restart.
-let questions: Question[] = [];
+import { getQuestions, addQuestion } from "@/lib/memory-store";
 
 // Always read the live data; never serve a cached snapshot.
 export const dynamic = "force-dynamic";
@@ -13,7 +9,8 @@ export async function GET() {
   if (supabase) {
     const { data, error } = await supabase
       .from("questions")
-      .select("id, body, author, created_at")
+      .select("id, body, author, votes, created_at")
+      .order("votes", { ascending: false })
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -22,8 +19,9 @@ export async function GET() {
     return NextResponse.json(data ?? []);
   }
 
-  // Fallback: in-memory array.
-  return NextResponse.json(questions);
+  // Fallback: in-memory store, sorted by votes.
+  const list = [...getQuestions()].sort((a, b) => b.votes - a.votes);
+  return NextResponse.json(list);
 }
 
 export async function POST(req: Request) {
@@ -32,8 +30,8 @@ export async function POST(req: Request) {
   if (supabase) {
     const { data, error } = await supabase
       .from("questions")
-      .insert({ body, author: author ?? "Anonymous" })
-      .select()
+      .insert({ body, author: author ?? "Anonymous" }) // votes defaults to 0
+      .select("id, body, author, votes, created_at")
       .single();
 
     if (error) {
@@ -42,12 +40,12 @@ export async function POST(req: Request) {
     return NextResponse.json(data);
   }
 
-  // Fallback: in-memory array.
-  const question: Question = {
+  // Fallback: in-memory store.
+  const question = addQuestion({
     id: crypto.randomUUID(),
     body,
     author: author ?? "Anonymous",
-  };
-  questions = [question, ...questions];
+    votes: 0,
+  });
   return NextResponse.json(question);
 }

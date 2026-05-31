@@ -32,6 +32,24 @@ export default function Questions({ initial }: { initial: Question[] }) {
     setQuestions((qs) => [saved, ...qs]);
   }
 
+  async function upvote(id: string) {
+    // optimistic: bump the count on screen right away
+    setQuestions((qs) =>
+      qs.map((q) => (q.id === id ? { ...q, votes: q.votes + 1 } : q))
+    );
+
+    const res = await fetch(`/api/questions/${id}/vote`, { method: "POST" });
+
+    // server said no — roll the count back
+    if (!res.ok) {
+      setQuestions((qs) =>
+        qs.map((q) => (q.id === id ? { ...q, votes: q.votes - 1 } : q))
+      );
+    }
+  }
+
+  const sorted = [...questions].sort((a, b) => b.votes - a.votes);
+
   return (
     <div className="space-y-6">
       {/* Submit card */}
@@ -56,10 +74,9 @@ export default function Questions({ initial }: { initial: Question[] }) {
         </div>
       </form>
 
-      {/* Questions list — each card leaves room on the right for the
-          Phase 5 upvote pill to drop into once voting is wired up. */}
+      {/* Questions list, most-upvoted first */}
       <ul className="space-y-3">
-        {questions.map((q) => (
+        {sorted.map((q) => (
           <li
             key={q.id}
             className="flex items-start gap-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/5"
@@ -70,6 +87,16 @@ export default function Questions({ initial }: { initial: Question[] }) {
                 {q.author}
               </p>
             </div>
+            <button
+              onClick={() => upvote(q.id)}
+              aria-label="Upvote"
+              className="flex shrink-0 flex-col items-center rounded-xl border border-gray-200 px-3 py-1.5 text-brand transition-colors hover:border-brand hover:bg-brand/5"
+            >
+              <span className="text-sm leading-none">▲</span>
+              <span className="text-sm font-semibold tabular-nums">
+                {q.votes}
+              </span>
+            </button>
           </li>
         ))}
       </ul>
