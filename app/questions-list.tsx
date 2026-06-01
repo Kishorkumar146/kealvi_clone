@@ -1,7 +1,13 @@
 "use client";
 import { useState, useEffect } from "react";
+import { getVoterId } from "@/lib/voter";
 
-type Question = { id: string; body: string; author: string | null };
+type Question = {
+  id: string;
+  body: string;
+  author: string | null;
+  votes: number;
+};
 
 export default function QuestionsList({
   initialQuestions,
@@ -24,8 +30,28 @@ export default function QuestionsList({
     });
     const created = await res.json();
 
-    setQuestions((qs) => [created, ...qs]); // show it at the top, no reload
+    setQuestions((qs) => [{ ...created, votes: 0 }, ...qs]);
     setDraft("");
+  }
+
+  async function upvote(id: string) {
+    // optimistic: assume success, update the UI now
+    setQuestions((qs) =>
+      qs.map((q) => (q.id === id ? { ...q, votes: q.votes + 1 } : q))
+    );
+
+    const res = await fetch(`/api/questions/${id}/vote`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ voterId: getVoterId() }),
+    });
+
+    // server said no (already voted) — roll back
+    if (!res.ok) {
+      setQuestions((qs) =>
+        qs.map((q) => (q.id === id ? { ...q, votes: q.votes - 1 } : q))
+      );
+    }
   }
 
   return (
@@ -48,8 +74,17 @@ export default function QuestionsList({
 
       <ul className="space-y-3">
         {questions.map((q) => (
-          <li key={q.id} className="rounded-lg border p-3">
-            {q.body}
+          <li
+            key={q.id}
+            className="flex items-center gap-3 rounded-lg border p-3"
+          >
+            <button
+              onClick={() => upvote(q.id)}
+              className="rounded-md border px-3 py-1 font-mono"
+            >
+              ▲ {q.votes}
+            </button>
+            <span>{q.body}</span>
           </li>
         ))}
       </ul>
