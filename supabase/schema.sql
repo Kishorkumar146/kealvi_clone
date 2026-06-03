@@ -1,14 +1,9 @@
--- Day 5 schema — run this once in the Supabase SQL Editor.
--- It resets to a clean slate (drops the previous experiment), creates the
--- tables in the shape the guide uses (votes as ROWS, not a column), adds the
--- indexes, and seeds 25 questions so pagination and search have volume.
-
 -- ── reset ──────────────────────────────────────────────────────────────────
 drop table if exists votes;
 drop table if exists questions cascade;
 drop function if exists increment_question_votes(uuid);
 
--- ── questions (Feature 1) ────────────────────────────────────────────────────
+-- ── questions ────────────────────────────────────────────────────────────────
 create table questions (
   id          uuid primary key default gen_random_uuid(),
   body        text not null,
@@ -16,24 +11,37 @@ create table questions (
   created_at  timestamptz default now()
 );
 
--- ── votes (Feature 3) ────────────────────────────────────────────────────────
--- one row per vote; the FK guarantees a vote points at a real question, and
--- the unique constraint enforces one vote per voter per question.
+-- ── votes ────────────────────────────────────────────────────────────────────
+-- type = 'up' or 'down'; unique constraint = one vote per voter per question.
+-- Switching vote = UPDATE the existing row (type changes, no duplicate).
 create table votes (
   id           uuid primary key default gen_random_uuid(),
   question_id  uuid not null references questions(id) on delete cascade,
   voter_id     text not null,
+  type         text not null check (type in ('up', 'down')),  -- ← new
   created_at   timestamptz default now(),
   unique (question_id, voter_id)
 );
 
 create index votes_question_id_idx on votes (question_id);
 
--- ── full-text search index (Feature 5) ───────────────────────────────────────
--- GIN = Generalized INverted index: the word → documents map behind search.
+-- ── vote_counts view ─────────────────────────────────────────────────────────
+-- Returns net score (upvotes − downvotes) per question.
+-- Query this instead of counting raw vote rows in your app.
+create or replace view vote_counts as
+select
+  question_id,
+  count(*) filter (where type = 'up')   as upvotes,
+  count(*) filter (where type = 'down') as downvotes,
+  count(*) filter (where type = 'up') -
+  count(*) filter (where type = 'down') as net_votes
+from votes
+group by question_id;
+
+-- ── full-text search index ───────────────────────────────────────────────────
 create index questions_fts_idx on questions using gin (to_tsvector('english', body));
 
--- ── seed (~25 questions, spaced out in time so ordering is stable) ───────────
+-- ── seed ─────────────────────────────────────────────────────────────────────
 insert into questions (body, author, created_at)
 select body, author, now() - (n || ' minutes')::interval
 from (

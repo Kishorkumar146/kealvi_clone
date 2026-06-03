@@ -1,39 +1,132 @@
 @import "tailwindcss";
 
-@theme {
-  --color-background: #f5f6fb;
-  --color-surface: #ffffff;
-  --color-foreground: #1a1a23;
-  --color-muted: #71717a;
-  --color-border: #e7e7f0;
+:root {
+  --color-background: #0f0e1a;
+  --color-surface: #1a1929;
+  --color-foreground: #e8e8f0;
+  --color-muted: #9090a8;
+  --color-border: #2a2940;
 
   --color-brand: #5b54e8;
   --color-brand-strong: #4a43d6;
-  --color-brand-soft: #edecfd;
+  --color-brand-soft: #1e1d3a;
 
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
 @layer base {
-  /* Tailwind v4 defaults `border` to currentColor — pin it to the theme so
-     plain `border` utilities render a soft, intentional line. */
   *,
   ::before,
   ::after {
     border-color: var(--color-border);
   }
 
+  html {
+    position: relative;
+    overflow-x: hidden;
+  }
+
+  /* Floating orbs */
+  html::before,
+  html::after {
+    content: "";
+    position: fixed;
+    border-radius: 50%;
+    filter: blur(80px);
+    pointer-events: none;
+    z-index: 0;
+    animation: float 12s ease-in-out infinite alternate;
+  }
+
+  /* top-left orb */
+  html::before {
+    width: 520px;
+    height: 520px;
+    top: -160px;
+    left: -160px;
+    background: radial-gradient(
+      circle,
+      rgba(91, 84, 232, 0.22),
+      transparent 70%
+    );
+    animation-duration: 14s;
+  }
+
+  /* bottom-right orb */
+  html::after {
+    width: 480px;
+    height: 480px;
+    bottom: -140px;
+    right: -140px;
+    background: radial-gradient(
+      circle,
+      rgba(139, 92, 246, 0.18),
+      transparent 70%
+    );
+    animation-duration: 10s;
+    animation-delay: -5s;
+  }
+
+  @keyframes float {
+    0%   { transform: translate(0, 0) scale(1); }
+    50%  { transform: translate(30px, 20px) scale(1.06); }
+    100% { transform: translate(-20px, 40px) scale(0.96); }
+  }
+
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
-    /* subtle brand glow behind the header */
-    background-image: radial-gradient(
-      48rem 24rem at 50% -8rem,
-      color-mix(in oklab, var(--color-brand) 18%, transparent),
-      transparent 70%
-    );
+    min-height: 100vh;
+    background-attachment: fixed;
+
+    /* layered gradients */
+    background-image:
+      /* top-center brand glow */
+      radial-gradient(
+        ellipse 80% 40% at 50% -10%,
+        rgba(91, 84, 232, 0.35),
+        transparent 70%
+      ),
+      /* bottom-right violet accent */
+      radial-gradient(
+        ellipse 50% 40% at 90% 100%,
+        rgba(139, 92, 246, 0.2),
+        transparent 60%
+      ),
+      /* bottom-left teal accent */
+      radial-gradient(
+        ellipse 50% 40% at 10% 100%,
+        rgba(56, 189, 248, 0.12),
+        transparent 60%
+      ),
+      /* center depth glow */
+      radial-gradient(
+        ellipse 60% 50% at 50% 60%,
+        rgba(91, 84, 232, 0.06),
+        transparent 80%
+      );
+
     background-repeat: no-repeat;
+  }
+
+  /* Techy grid overlay */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background-image:
+      linear-gradient(rgba(91, 84, 232, 0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(91, 84, 232, 0.04) 1px, transparent 1px);
+    background-size: 48px 48px;
+  }
+
+  /* Keep all content above background layers */
+  body > * {
+    position: relative;
+    z-index: 1;
   }
 
   ::selection {
@@ -44,6 +137,7 @@
   input:focus-visible,
   textarea:focus-visible,
   button:focus-visible {
+    outline: 2px solid rgba(91, 84, 232, 0.55);
     outline: 2px solid color-mix(in oklab, var(--color-brand) 55%, transparent);
     outline-offset: 2px;
   }

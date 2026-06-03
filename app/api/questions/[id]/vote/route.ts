@@ -1,26 +1,56 @@
 import { supabase } from "@/lib/supabase";
 
-// We don't check-then-insert (that has a time-of-check-to-time-of-use race).
-// We just try to insert and let the unique(question_id, voter_id) constraint
-// be the referee — it's enforced atomically as part of the insert.
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: questionId } = await params;
-  const { voterId } = await req.json();
+  const { voterId, type } = await req.json();
 
+  if (!voterId || !type || !["up", "down"].includes(type)) {
+    return Response.json({ error: "invalid request" }, { status: 400 });
+  }
+
+  // 1. Check for existing vote by this voter on this question
+  const { data: existing, error: fetchError } = await supabase
+    .from("votes")
+    .select("id, type")
+    .eq("question_id", questionId)
+    .eq("voter_id", voterId)
+    .maybeSingle();
+
+  if (fetchError) {
+    return Response.json({ error: fetchError.message }, { status: 500 });
+  }
+
+  // 2a. Same vote → toggle off (delete)
+  if (existing && existing.type === type) {
+    const { error } = await supabase
+      .from("votes")
+      .delete()
+      .eq("id", existing.id);
+    if (error) return Response.json({ error: error.message }, { status: 500 });
+    return Response.json({ action: "removed", type });
+  }
+
+  // 2b. Opposite vote → switch it (update)
+  if (existing && existing.type !== type) {
+    const { error } = await supabase
+      .from("votes")
+      .update({ type })
+      .eq("id", existing.id);
+    if (error) return Response.json({ error: error.message }, { status: 500 });
+    return Response.json({ action: "switched", type });
+  }
+
+  // 2c. No prior vote → insert new
   const { error } = await supabase
     .from("votes")
-    .insert({ question_id: questionId, voter_id: voterId });
+    .insert({ question_id: questionId, voter_id: voterId, type });
 
   if (error) {
-    if (error.code === "23505") {
-      // Postgres unique violation → this voter already voted on this question.
-      return Response.json({ error: "already voted" }, { status: 409 });
-    }
     return Response.json({ error: error.message }, { status: 500 });
   }
 
-  return Response.json({ ok: true });
+  return Response.json({ action: "added", type });
 }
