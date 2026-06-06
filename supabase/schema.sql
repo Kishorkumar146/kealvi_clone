@@ -19,7 +19,6 @@ create table questions (
 );
 
 -- ── votes ────────────────────────────────────────────────────────────────────
--- No unique constraint — every click inserts a new row so counts grow freely.
 create table votes (
   id           uuid primary key default gen_random_uuid(),
   question_id  uuid not null references questions(id) on delete cascade,
@@ -39,7 +38,6 @@ create table polls (
 );
 
 -- ── poll_votes ────────────────────────────────────────────────────────────────
--- unique constraint allows switching but not double voting
 create table poll_votes (
   id          uuid primary key default gen_random_uuid(),
   poll_id     uuid not null references polls(id) on delete cascade,
@@ -50,6 +48,23 @@ create table poll_votes (
 );
 
 create index poll_votes_poll_id_idx on poll_votes (poll_id);
+
+-- ── comments ─────────────────────────────────────────────────────────────────
+create table comments (
+  id           uuid primary key default gen_random_uuid(),
+  question_id  uuid not null references questions(id) on delete cascade,
+  body         text not null,
+  created_at   timestamptz default now()
+);
+
+create index comments_question_id_idx on comments (question_id);
+
+-- ── disable RLS ───────────────────────────────────────────────────────────────
+alter table questions disable row level security;
+alter table votes disable row level security;
+alter table polls disable row level security;
+alter table poll_votes disable row level security;
+alter table comments disable row level security;
 
 -- ── rpc: paginated questions with votes + pin + poll ─────────────────────────
 create or replace function get_questions_with_votes(p_offset int, p_limit int)

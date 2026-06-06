@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { getVoterId } from "@/lib/voter";
 import PollBlock from "@/components/PollBlock";
+import CommentSection from "@/components/CommentSection";
 
 type Poll = {
   id: string;
@@ -361,12 +362,15 @@ export default function QuestionsList({
                     </div>
                   )}
 
-                  {/* Poll results */}
+                 {/* Poll results */}
                   {q.poll && q.poll.id && (
                     <div className="mt-2">
                       <PollBlock pollId={q.poll.id} options={q.poll.options} />
                     </div>
                   )}
+
+                  {/* Comments */}
+                  <CommentSection questionId={q.id} />
                 </div>
               </div>
             </li>
