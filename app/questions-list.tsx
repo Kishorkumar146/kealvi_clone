@@ -29,6 +29,7 @@ export default function QuestionsList({
   const [query, setQuery] = useState("");
   const [hasMore, setHasMore] = useState(initialHasMore);
   const [loading, setLoading] = useState(false);
+  const [searching, setSearching] = useState(false);
   const [userVotes, setUserVotes] = useState<Record<string, "up" | "down">>({});
 
   const [showPollFor, setShowPollFor] = useState<string | null>(null);
@@ -40,6 +41,7 @@ export default function QuestionsList({
 
   useEffect(() => {
     const id = setTimeout(async () => {
+      setSearching(true);
       const url = query
         ? `/api/questions?q=${encodeURIComponent(query)}`
         : `/api/questions`;
@@ -47,6 +49,7 @@ export default function QuestionsList({
       const data = await res.json();
       setQuestions(data.questions);
       setHasMore(data.hasMore ?? false);
+      setSearching(false);
     }, 300);
     return () => clearTimeout(id);
   }, [query]);
@@ -149,7 +152,6 @@ export default function QuestionsList({
       setPollError(null);
     } else {
       setPollError(data.error ?? "Failed to create poll. Try again.");
-      console.error("Poll creation failed:", data.error);
     }
   }
 
@@ -190,14 +192,29 @@ export default function QuestionsList({
 
       {/* Search */}
       <div className="flex items-center gap-3">
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search questions…"
-          className="w-full flex-1 rounded-xl border bg-surface px-4 py-2.5 text-sm outline-none placeholder:text-muted focus:border-brand"
-        />
+        <div className="relative flex-1">
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search questions…"
+            className="w-full rounded-xl border bg-surface px-4 py-2.5 pr-8 text-sm outline-none placeholder:text-muted focus:border-brand"
+          />
+          {query && (
+            <button
+              type="button"
+              onClick={() => setQuery("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted hover:text-foreground"
+            >
+              ✕
+            </button>
+          )}
+        </div>
         <span className="shrink-0 text-xs text-muted">
-          {hydrated ? "Interactive ✓" : "Loading interactivity…"}
+          {searching
+            ? "Searching…"
+            : hydrated
+            ? "Interactive ✓"
+            : "Loading…"}
         </span>
       </div>
 
@@ -274,7 +291,7 @@ export default function QuestionsList({
                       </button>
 
                       {/* Poll button */}
-                      {!q.poll && (
+                      {(!q.poll || !q.poll.id) && (
                         <button
                           type="button"
                           onClick={() => {
@@ -345,8 +362,10 @@ export default function QuestionsList({
                   )}
 
                   {/* Poll results */}
-                  {q.poll && (
-                    <PollBlock pollId={q.poll.id} options={q.poll.options} />
+                  {q.poll && q.poll.id && (
+                    <div className="mt-2">
+                      <PollBlock pollId={q.poll.id} options={q.poll.options} />
+                    </div>
                   )}
                 </div>
               </div>
@@ -357,11 +376,13 @@ export default function QuestionsList({
 
       {questions.length === 0 && (
         <p className="rounded-2xl border border-dashed p-8 text-center text-sm text-muted">
-          No questions yet — be the first to ask.
+          {query
+            ? `No questions found for "${query}"`
+            : "No questions yet — be the first to ask."}
         </p>
       )}
 
-      {hasMore && (
+      {hasMore && !query && (
         <div className="flex justify-center">
           <button
             type="button"

@@ -43,7 +43,6 @@ export async function POST(
     return Response.json({ error: "invalid request" }, { status: 400 });
   }
 
-  // Check for existing vote
   const { data: existing, error: fetchError } = await supabase
     .from("poll_votes")
     .select("id, option_idx")
@@ -53,7 +52,6 @@ export async function POST(
 
   if (fetchError) return Response.json({ error: fetchError.message }, { status: 500 });
 
-  // Switch vote if different option selected
   if (existing) {
     const { error } = await supabase
       .from("poll_votes")
@@ -63,11 +61,36 @@ export async function POST(
     return Response.json({ action: "switched", optionIdx });
   }
 
-  // Insert new vote
   const { error } = await supabase
     .from("poll_votes")
     .insert({ poll_id: pollId, voter_id: voterId, option_idx: optionIdx });
 
   if (error) return Response.json({ error: error.message }, { status: 500 });
   return Response.json({ action: "added", optionIdx });
+}
+
+// DELETE — remove a poll and its votes
+export async function DELETE(
+  _req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id: pollId } = await params;
+
+  const { error: votesError } = await supabase
+    .from("poll_votes")
+    .delete()
+    .eq("poll_id", pollId);
+
+  if (votesError)
+    return Response.json({ error: votesError.message }, { status: 500 });
+
+  const { error } = await supabase
+    .from("polls")
+    .delete()
+    .eq("id", pollId);
+
+  if (error)
+    return Response.json({ error: error.message }, { status: 500 });
+
+  return Response.json({ success: true });
 }
