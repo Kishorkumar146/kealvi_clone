@@ -1,15 +1,20 @@
 -- ── reset ──────────────────────────────────────────────────────────────────
-drop table if exists votes;
+drop table if exists poll_votes cascade;
+drop table if exists polls cascade;
+drop table if exists votes cascade;
+drop table if exists comments cascade;
 drop table if exists questions cascade;
 drop function if exists increment_question_votes(uuid);
 drop function if exists get_questions_with_votes(int, int);
 drop function if exists search_questions_with_votes(text, int);
+drop view if exists vote_counts;
 
 -- ── questions ────────────────────────────────────────────────────────────────
 create table questions (
   id          uuid primary key default gen_random_uuid(),
   body        text not null,
   author      text,
+  pinned      boolean default false,
   created_at  timestamptz default now()
 );
 
@@ -25,14 +30,38 @@ create table votes (
 
 create index votes_question_id_idx on votes (question_id);
 
--- ── rpc: paginated questions with net votes ───────────────────────────────────
+-- ── polls ─────────────────────────────────────────────────────────────────────
+create table polls (
+  id           uuid primary key default gen_random_uuid(),
+  question_id  uuid not null references questions(id) on delete cascade,
+  options      text[] not null,
+  created_at   timestamptz default now()
+);
+
+-- ── poll_votes ────────────────────────────────────────────────────────────────
+-- unique constraint allows switching but not double voting
+create table poll_votes (
+  id          uuid primary key default gen_random_uuid(),
+  poll_id     uuid not null references polls(id) on delete cascade,
+  voter_id    text not null,
+  option_idx  int not null,
+  created_at  timestamptz default now(),
+  unique (poll_id, voter_id)
+);
+
+create index poll_votes_poll_id_idx on poll_votes (poll_id);
+
+-- ── rpc: paginated questions with votes + pin + poll ─────────────────────────
 create or replace function get_questions_with_votes(p_offset int, p_limit int)
 returns table (
-  id uuid,
-  body text,
-  author text,
-  created_at timestamptz,
-  net_votes bigint
+  id           uuid,
+  body         text,
+  author       text,
+  created_at   timestamptz,
+  net_votes    bigint,
+  pinned       boolean,
+  poll_id      uuid,
+  poll_options text[]
 ) as $$
   select
     q.id,
@@ -42,23 +71,30 @@ returns table (
     coalesce(
       sum(case when v.type = 'up' then 1 when v.type = 'down' then -1 else 0 end),
       0
-    ) as net_votes
+    ) as net_votes,
+    q.pinned,
+    p.id as poll_id,
+    p.options as poll_options
   from questions q
   left join votes v on v.question_id = q.id
-  group by q.id, q.body, q.author, q.created_at
-  order by q.created_at desc
+  left join polls p on p.question_id = q.id
+  group by q.id, q.body, q.author, q.created_at, q.pinned, p.id, p.options
+  order by q.pinned desc, q.created_at desc
   limit p_limit + 1
   offset p_offset;
 $$ language sql stable;
 
--- ── rpc: search questions with net votes ──────────────────────────────────────
+-- ── rpc: search questions with votes + pin + poll ─────────────────────────────
 create or replace function search_questions_with_votes(p_query text, p_limit int)
 returns table (
-  id uuid,
-  body text,
-  author text,
-  created_at timestamptz,
-  net_votes bigint
+  id           uuid,
+  body         text,
+  author       text,
+  created_at   timestamptz,
+  net_votes    bigint,
+  pinned       boolean,
+  poll_id      uuid,
+  poll_options text[]
 ) as $$
   select
     q.id,
@@ -68,12 +104,16 @@ returns table (
     coalesce(
       sum(case when v.type = 'up' then 1 when v.type = 'down' then -1 else 0 end),
       0
-    ) as net_votes
+    ) as net_votes,
+    q.pinned,
+    p.id as poll_id,
+    p.options as poll_options
   from questions q
   left join votes v on v.question_id = q.id
+  left join polls p on p.question_id = q.id
   where to_tsvector('english', q.body) @@ websearch_to_tsquery('english', p_query)
-  group by q.id, q.body, q.author, q.created_at
-  order by q.created_at desc
+  group by q.id, q.body, q.author, q.created_at, q.pinned, p.id, p.options
+  order by q.pinned desc, q.created_at desc
   limit p_limit;
 $$ language sql stable;
 

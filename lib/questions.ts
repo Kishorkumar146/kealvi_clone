@@ -13,6 +13,10 @@ export async function getQuestionsPage(offset: number, limit: number) {
     body: q.body,
     author: q.author,
     votes: Number(q.net_votes ?? 0),
+    pinned: q.pinned ?? false,
+    poll: q.poll_id
+      ? { id: q.poll_id, options: q.poll_options }
+      : null,
   }));
 
   const hasMore = rows.length > limit;
@@ -32,6 +36,10 @@ export async function searchQuestions(q: string, limit: number) {
     body: row.body,
     author: row.author,
     votes: Number(row.net_votes ?? 0),
+    pinned: row.pinned ?? false,
+    poll: row.poll_id
+      ? { id: row.poll_id, options: row.poll_options }
+      : null,
   }));
 }
 

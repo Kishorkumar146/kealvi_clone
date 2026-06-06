@@ -1,15 +1,30 @@
 @import "tailwindcss";
 
-:root {
-  --color-background: #0f0e1a;
-  --color-surface: #1a1929;
-  --color-foreground: #e8e8f0;
-  --color-muted: #9090a8;
-  --color-border: #2a2940;
+@theme {
+  --color-background: #f8fafc;
+  --color-surface: #ffffff;
+  --color-foreground: #0f172a;
+  --color-muted: #64748b;
+  --color-border: #e2e8f0;
 
-  --color-brand: #5b54e8;
-  --color-brand-strong: #4a43d6;
-  --color-brand-soft: #1e1d3a;
+  --color-brand: #2563eb;
+  --color-brand-strong: #1d4ed8;
+  --color-brand-soft: #eff6ff;
+
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+:root {
+  --color-background: #f8fafc;
+  --color-surface: #ffffff;
+  --color-foreground: #0f172a;
+  --color-muted: #64748b;
+  --color-border: #e2e8f0;
+
+  --color-brand: #2563eb;
+  --color-brand-strong: #1d4ed8;
+  --color-brand-soft: #eff6ff;
 
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
@@ -33,45 +48,45 @@
     content: "";
     position: fixed;
     border-radius: 50%;
-    filter: blur(80px);
+    filter: blur(90px);
     pointer-events: none;
     z-index: 0;
-    animation: float 12s ease-in-out infinite alternate;
+    animation: float 14s ease-in-out infinite alternate;
   }
 
-  /* top-left orb */
+  /* top-left orb — soft blue */
   html::before {
-    width: 520px;
-    height: 520px;
-    top: -160px;
-    left: -160px;
+    width: 560px;
+    height: 560px;
+    top: -180px;
+    left: -180px;
     background: radial-gradient(
       circle,
-      rgba(91, 84, 232, 0.22),
+      rgba(37, 99, 235, 0.12),
       transparent 70%
     );
-    animation-duration: 14s;
+    animation-duration: 16s;
   }
 
-  /* bottom-right orb */
+  /* bottom-right orb — lighter blue */
   html::after {
-    width: 480px;
-    height: 480px;
-    bottom: -140px;
-    right: -140px;
+    width: 500px;
+    height: 500px;
+    bottom: -160px;
+    right: -160px;
     background: radial-gradient(
       circle,
-      rgba(139, 92, 246, 0.18),
+      rgba(96, 165, 250, 0.1),
       transparent 70%
     );
-    animation-duration: 10s;
-    animation-delay: -5s;
+    animation-duration: 12s;
+    animation-delay: -6s;
   }
 
   @keyframes float {
     0%   { transform: translate(0, 0) scale(1); }
-    50%  { transform: translate(30px, 20px) scale(1.06); }
-    100% { transform: translate(-20px, 40px) scale(0.96); }
+    50%  { transform: translate(30px, 20px) scale(1.05); }
+    100% { transform: translate(-20px, 40px) scale(0.97); }
   }
 
   body {
@@ -82,35 +97,26 @@
 
     /* layered gradients */
     background-image:
-      /* top-center brand glow */
       radial-gradient(
         ellipse 80% 40% at 50% -10%,
-        rgba(91, 84, 232, 0.35),
+        rgba(37, 99, 235, 0.08),
         transparent 70%
       ),
-      /* bottom-right violet accent */
       radial-gradient(
         ellipse 50% 40% at 90% 100%,
-        rgba(139, 92, 246, 0.2),
+        rgba(96, 165, 250, 0.07),
         transparent 60%
       ),
-      /* bottom-left teal accent */
       radial-gradient(
         ellipse 50% 40% at 10% 100%,
-        rgba(56, 189, 248, 0.12),
+        rgba(147, 197, 253, 0.06),
         transparent 60%
-      ),
-      /* center depth glow */
-      radial-gradient(
-        ellipse 60% 50% at 50% 60%,
-        rgba(91, 84, 232, 0.06),
-        transparent 80%
       );
 
     background-repeat: no-repeat;
   }
 
-  /* Techy grid overlay */
+  /* Subtle grid overlay */
   body::before {
     content: "";
     position: fixed;
@@ -118,8 +124,8 @@
     z-index: 0;
     pointer-events: none;
     background-image:
-      linear-gradient(rgba(91, 84, 232, 0.04) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(91, 84, 232, 0.04) 1px, transparent 1px);
+      linear-gradient(rgba(37, 99, 235, 0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(37, 99, 235, 0.03) 1px, transparent 1px);
     background-size: 48px 48px;
   }
 
@@ -137,7 +143,7 @@
   input:focus-visible,
   textarea:focus-visible,
   button:focus-visible {
-    outline: 2px solid rgba(91, 84, 232, 0.55);
+    outline: 2px solid rgba(37, 99, 235, 0.55);
     outline: 2px solid color-mix(in oklab, var(--color-brand) 55%, transparent);
     outline-offset: 2px;
   }
