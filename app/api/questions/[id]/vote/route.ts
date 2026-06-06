@@ -1,5 +1,26 @@
 import { supabase } from "@/lib/supabase";
 
+// GET — return real net vote count for a single question
+export async function GET(
+  _req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id: questionId } = await params;
+
+  const { data, error } = await supabase
+    .from("votes")
+    .select("type")
+    .eq("question_id", questionId);
+
+  if (error) return Response.json({ error: error.message }, { status: 500 });
+
+  const upvotes = (data ?? []).filter((v) => v.type === "up").length;
+  const downvotes = (data ?? []).filter((v) => v.type === "down").length;
+
+  return Response.json({ upvotes, downvotes, net_votes: upvotes - downvotes });
+}
+
+// POST — insert a new vote row on every click (no duplicate prevention)
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -11,46 +32,11 @@ export async function POST(
     return Response.json({ error: "invalid request" }, { status: 400 });
   }
 
-  // 1. Check for existing vote by this voter on this question
-  const { data: existing, error: fetchError } = await supabase
-    .from("votes")
-    .select("id, type")
-    .eq("question_id", questionId)
-    .eq("voter_id", voterId)
-    .maybeSingle();
-
-  if (fetchError) {
-    return Response.json({ error: fetchError.message }, { status: 500 });
-  }
-
-  // 2a. Same vote → toggle off (delete)
-  if (existing && existing.type === type) {
-    const { error } = await supabase
-      .from("votes")
-      .delete()
-      .eq("id", existing.id);
-    if (error) return Response.json({ error: error.message }, { status: 500 });
-    return Response.json({ action: "removed", type });
-  }
-
-  // 2b. Opposite vote → switch it (update)
-  if (existing && existing.type !== type) {
-    const { error } = await supabase
-      .from("votes")
-      .update({ type })
-      .eq("id", existing.id);
-    if (error) return Response.json({ error: error.message }, { status: 500 });
-    return Response.json({ action: "switched", type });
-  }
-
-  // 2c. No prior vote → insert new
   const { error } = await supabase
     .from("votes")
     .insert({ question_id: questionId, voter_id: voterId, type });
 
-  if (error) {
-    return Response.json({ error: error.message }, { status: 500 });
-  }
+  if (error) return Response.json({ error: error.message }, { status: 500 });
 
   return Response.json({ action: "added", type });
 }

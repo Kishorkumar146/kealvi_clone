@@ -2,6 +2,8 @@
 drop table if exists votes;
 drop table if exists questions cascade;
 drop function if exists increment_question_votes(uuid);
+drop function if exists get_questions_with_votes(int, int);
+drop function if exists search_questions_with_votes(text, int);
 
 -- ── questions ────────────────────────────────────────────────────────────────
 create table questions (
@@ -12,31 +14,68 @@ create table questions (
 );
 
 -- ── votes ────────────────────────────────────────────────────────────────────
--- type = 'up' or 'down'; unique constraint = one vote per voter per question.
--- Switching vote = UPDATE the existing row (type changes, no duplicate).
+-- No unique constraint — every click inserts a new row so counts grow freely.
 create table votes (
   id           uuid primary key default gen_random_uuid(),
   question_id  uuid not null references questions(id) on delete cascade,
   voter_id     text not null,
-  type         text not null check (type in ('up', 'down')),  -- ← new
-  created_at   timestamptz default now(),
-  unique (question_id, voter_id)
+  type         text not null check (type in ('up', 'down')),
+  created_at   timestamptz default now()
 );
 
 create index votes_question_id_idx on votes (question_id);
 
--- ── vote_counts view ─────────────────────────────────────────────────────────
--- Returns net score (upvotes − downvotes) per question.
--- Query this instead of counting raw vote rows in your app.
-create or replace view vote_counts as
-select
-  question_id,
-  count(*) filter (where type = 'up')   as upvotes,
-  count(*) filter (where type = 'down') as downvotes,
-  count(*) filter (where type = 'up') -
-  count(*) filter (where type = 'down') as net_votes
-from votes
-group by question_id;
+-- ── rpc: paginated questions with net votes ───────────────────────────────────
+create or replace function get_questions_with_votes(p_offset int, p_limit int)
+returns table (
+  id uuid,
+  body text,
+  author text,
+  created_at timestamptz,
+  net_votes bigint
+) as $$
+  select
+    q.id,
+    q.body,
+    q.author,
+    q.created_at,
+    coalesce(
+      sum(case when v.type = 'up' then 1 when v.type = 'down' then -1 else 0 end),
+      0
+    ) as net_votes
+  from questions q
+  left join votes v on v.question_id = q.id
+  group by q.id, q.body, q.author, q.created_at
+  order by q.created_at desc
+  limit p_limit + 1
+  offset p_offset;
+$$ language sql stable;
+
+-- ── rpc: search questions with net votes ──────────────────────────────────────
+create or replace function search_questions_with_votes(p_query text, p_limit int)
+returns table (
+  id uuid,
+  body text,
+  author text,
+  created_at timestamptz,
+  net_votes bigint
+) as $$
+  select
+    q.id,
+    q.body,
+    q.author,
+    q.created_at,
+    coalesce(
+      sum(case when v.type = 'up' then 1 when v.type = 'down' then -1 else 0 end),
+      0
+    ) as net_votes
+  from questions q
+  left join votes v on v.question_id = q.id
+  where to_tsvector('english', q.body) @@ websearch_to_tsquery('english', p_query)
+  group by q.id, q.body, q.author, q.created_at
+  order by q.created_at desc
+  limit p_limit;
+$$ language sql stable;
 
 -- ── full-text search index ───────────────────────────────────────────────────
 create index questions_fts_idx on questions using gin (to_tsvector('english', body));

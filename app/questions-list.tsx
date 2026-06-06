@@ -34,15 +34,23 @@ export default function QuestionsList({
       const res = await fetch(url);
       const data = await res.json();
       setQuestions(data.questions);
-      setHasMore(data.hasMore);
+      setHasMore(data.hasMore ?? false);
     }, 300);
-
     return () => clearTimeout(id);
   }, [query]);
 
+  // Re-fetch real vote count for a single question from server
+  async function refreshVoteCount(id: string) {
+    const res = await fetch(`/api/questions/${id}/vote`);
+    if (!res.ok) return;
+    const data = await res.json();
+    setQuestions((qs) =>
+      qs.map((q) => (q.id === id ? { ...q, votes: data.net_votes } : q))
+    );
+  }
+
   async function submit() {
     if (!draft.trim()) return;
-
     const res = await fetch("/api/questions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -54,51 +62,38 @@ export default function QuestionsList({
   }
 
   async function vote(id: string, type: "up" | "down") {
-    const current = userVotes[id];
-    const isToggle = current === type;
-    const isSwitch = !!current && current !== type;
-
     // Optimistic UI update
     setQuestions((qs) =>
-      qs.map((q) => {
-        if (q.id !== id) return q;
-        if (isToggle) return { ...q, votes: q.votes + (type === "up" ? -1 : 1) };
-        if (isSwitch) return { ...q, votes: q.votes + (type === "up" ? 2 : -2) };
-        return { ...q, votes: q.votes + (type === "up" ? 1 : -1) };
-      })
+      qs.map((q) =>
+        q.id === id
+          ? { ...q, votes: q.votes + (type === "up" ? 1 : -1) }
+          : q
+      )
     );
 
-    // Optimistic vote state
-    setUserVotes((prev) => {
-      if (isToggle) {
-        const next = { ...prev };
-        delete next[id];
-        return next;
-      }
-      return { ...prev, [id]: type };
-    });
+    setUserVotes((prev) => ({ ...prev, [id]: type }));
 
-    // API call — send type
     const res = await fetch(`/api/questions/${id}/vote`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ voterId: getVoterId(), type }),
     });
 
-    // Roll back on failure
-    if (!res.ok) {
+    if (res.ok) {
+      // Sync real count from server after vote succeeds
+      await refreshVoteCount(id);
+    } else {
+      // Roll back optimistic update on failure
       setQuestions((qs) =>
-        qs.map((q) => {
-          if (q.id !== id) return q;
-          if (isToggle) return { ...q, votes: q.votes - (type === "up" ? -1 : 1) };
-          if (isSwitch) return { ...q, votes: q.votes - (type === "up" ? 2 : -2) };
-          return { ...q, votes: q.votes - (type === "up" ? 1 : -1) };
-        })
+        qs.map((q) =>
+          q.id === id
+            ? { ...q, votes: q.votes - (type === "up" ? 1 : -1) }
+            : q
+        )
       );
       setUserVotes((prev) => {
         const next = { ...prev };
-        if (current) next[id] = current;
-        else delete next[id];
+        delete next[id];
         return next;
       });
     }
@@ -158,16 +153,14 @@ export default function QuestionsList({
             >
               {/* Vote column */}
               <div className="flex shrink-0 flex-col items-center gap-1">
-
                 {/* Upvote */}
                 <button
                   onClick={() => vote(q.id, "up")}
                   title="Upvote"
                   className={`flex items-center justify-center rounded-xl border px-3.5 py-1.5 text-xs font-bold transition-colors
-                    ${
-                      voted === "up"
-                        ? "border-brand bg-brand text-white"
-                        : "border-current text-brand hover:border-brand hover:bg-brand-soft"
+                    ${voted === "up"
+                      ? "border-brand bg-brand text-white"
+                      : "border-current text-brand hover:border-brand hover:bg-brand-soft"
                     }`}
                 >
                   ▲
@@ -191,10 +184,9 @@ export default function QuestionsList({
                   onClick={() => vote(q.id, "down")}
                   title="Downvote"
                   className={`flex items-center justify-center rounded-xl border px-3.5 py-1.5 text-xs font-bold transition-colors
-                    ${
-                      voted === "down"
-                        ? "border-red-500 bg-red-500 text-white"
-                        : "border-current text-red-400 hover:border-red-400 hover:bg-red-50"
+                    ${voted === "down"
+                      ? "border-red-500 bg-red-500 text-white"
+                      : "border-current text-red-400 hover:border-red-400 hover:bg-red-50"
                     }`}
                 >
                   ▼
