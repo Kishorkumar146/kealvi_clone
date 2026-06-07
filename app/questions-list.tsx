@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { getVoterId } from "@/lib/voter";
 import PollBlock from "@/components/PollBlock";
 import CommentSection from "@/components/CommentSection";
+import AIAnswerModal from "@/components/AIAnswerModal";
 
 type Poll = {
   id: string;
@@ -32,6 +33,7 @@ export default function QuestionsList({
   const [loading, setLoading] = useState(false);
   const [searching, setSearching] = useState(false);
   const [userVotes, setUserVotes] = useState<Record<string, "up" | "down">>({});
+  const [aiQuestion, setAiQuestion] = useState<string | null>(null);
 
   const [showPollFor, setShowPollFor] = useState<string | null>(null);
   const [pollOptions, setPollOptions] = useState(["", "", "", ""]);
@@ -308,6 +310,16 @@ export default function QuestionsList({
                           📊 Poll
                         </button>
                       )}
+
+                      {/* Ask AI button */}
+                      <button
+                        type="button"
+                        onClick={() => setAiQuestion(q.body)}
+                        title="Ask AI"
+                        className="rounded-lg border border-current px-2 py-1 text-xs text-muted transition-colors hover:border-brand hover:text-brand"
+                      >
+                        ✨ Ask AI
+                      </button>
                     </div>
                   </div>
 
@@ -362,7 +374,7 @@ export default function QuestionsList({
                     </div>
                   )}
 
-                 {/* Poll results */}
+                  {/* Poll results */}
                   {q.poll && q.poll.id && (
                     <div className="mt-2">
                       <PollBlock pollId={q.poll.id} options={q.poll.options} />
@@ -397,6 +409,14 @@ export default function QuestionsList({
             {loading ? "Loading…" : "Load more"}
           </button>
         </div>
+      )}
+
+      {/* AI Answer Modal */}
+      {aiQuestion && (
+        <AIAnswerModal
+          question={aiQuestion}
+          onClose={() => setAiQuestion(null)}
+        />
       )}
     </div>
   );
